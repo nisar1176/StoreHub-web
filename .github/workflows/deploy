@@ -1,0 +1,40 @@
+name: Deploy StoreHub
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Unpack the newest zip
+        run: |
+          z=$(git log -1 --format= --name-only --diff-filter=AM -- '*.zip' | head -1)
+          [ -z "$z" ] && z=$(ls *.zip | head -1)
+          echo "Using: $z"
+          mkdir site
+          unzip -q "$z" -d site
+          if [ "$(ls site | wc -l)" -eq 1 ] && [ -d "site/$(ls site)" ]; then
+            mv site/*/* site/ && rmdir site/*/ 2>/dev/null || true
+          fi
+          ls -la site
+          test -f site/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
